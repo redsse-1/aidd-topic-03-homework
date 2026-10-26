@@ -19,6 +19,4 @@ def get_graph(share: Share) -> str:
             )
         ],
         output_type="div",
-        show_link=False,
-        link_text="",
     )

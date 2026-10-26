@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -6,12 +6,30 @@ from django.core.exceptions import ImproperlyConfigured
 from django.test import SimpleTestCase, TestCase, override_settings
 
 from dashboard.models import Share
-from dashboard.services.market_data import Quote, get_market_data_provider
+from dashboard.services.graph import get_graph
+from dashboard.services.market_data import (
+    HistoricalPrice,
+    Quote,
+    get_market_data_provider,
+)
 from dashboard.services.providers.moex import MoexProvider
 from dashboard.tasks import update_last_price
 
 
 class MarketDataProviderTests(SimpleTestCase):
+    def test_graph_renders_with_current_plotly_api(self):
+        share = Share(ticker="SBER")
+        history = [
+            HistoricalPrice(date(2026, 10, 23), Decimal("292.32")),
+            HistoricalPrice(date(2026, 10, 26), Decimal("296.1")),
+        ]
+        with patch("dashboard.services.graph.get_market_data_provider") as factory:
+            factory.return_value.get_history.return_value = history
+            graph = get_graph(share)
+
+        self.assertIn("<div", graph)
+        self.assertIn("plotly", graph.lower())
+
     def test_moex_maps_iss_instruments_to_share_fields(self):
         provider = MoexProvider()
         payload = {
