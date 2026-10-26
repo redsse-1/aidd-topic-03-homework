@@ -1,12 +1,10 @@
 from django import forms
-from django.contrib.auth import authenticate
-from django.core.exceptions import ValidationError
 
 from user.models import User
 
 
 class RegistrationForm(forms.Form):
-    """Форма регистрации пользователей"""
+    """Registration form for the built-in Django user model."""
 
     email = forms.EmailField(
         required=True,
@@ -27,34 +25,33 @@ class RegistrationForm(forms.Form):
         ),
     )
 
+    def clean_email(self):
+        return self.cleaned_data["email"].lower()
+
     def clean(self):
-        super().clean()
-        email = self.cleaned_data["email"]
-        password1 = self.cleaned_data["password1"]
-        password2 = self.cleaned_data["password2"]
+        cleaned_data = super().clean()
+        password1 = cleaned_data.get("password1")
+        password2 = cleaned_data.get("password2")
         if password1 and password2 and password1 != password2:
-            errors = ["Введенные пароли не совпадают"]
-            raise ValidationError(errors)
+            self.add_error("password2", "Введенные пароли не совпадают")
 
-        user = User.objects.filter(email=email)
-
-        if user:
-            errors = [
-                "Данный e-mail уже зарегистрирован! Введите другой e-mail или"
-                " воспользуйтесь формой авторизации."
-            ]
-            raise ValidationError(errors)
+        email = cleaned_data.get("email")
+        if email and User.objects.filter(email__iexact=email).exists():
+            self.add_error(
+                "email",
+                "Данный e-mail уже зарегистрирован! Введите другой e-mail или "
+                "воспользуйтесь формой авторизации.",
+            )
+        return cleaned_data
 
     def save(self):
         email = self.cleaned_data["email"]
         password = self.cleaned_data["password1"]
-        User.objects.create_user(email, email, password)
-        user = authenticate(username=email, password=password)
-        return user
+        return User.objects.create_user(email, email, password)
 
 
 class AuthForm(forms.Form):
-    """Форма авторизации пользователей"""
+    """Login form."""
 
     email = forms.EmailField(
         required=True,

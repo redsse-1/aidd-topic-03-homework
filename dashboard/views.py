@@ -1,11 +1,11 @@
-from django.shortcuts import render, redirect
+from django.contrib.auth.mixins import UserPassesTestMixin
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, DeleteView, ListView, View, UpdateView
 
 from .forms import ShareModelForm
 from .models import Share
 from .services.graph import get_graph
-from django.contrib.auth.mixins import UserPassesTestMixin
 
 
 class IsUserAuthenticatedMixin(UserPassesTestMixin):
@@ -29,7 +29,7 @@ class ShareListView(ListView):
 class ShareDetailView(View):
     @staticmethod
     def get(request, pk):
-        share = Share.objects.get(id=pk)
+        share = get_object_or_404(Share, id=pk)
 
         return render(
             request,

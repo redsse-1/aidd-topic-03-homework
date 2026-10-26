@@ -6,7 +6,7 @@ from .forms import AuthForm, RegistrationForm
 
 
 class AuthView(View):
-    """Авторизация"""
+    """Login and authentication."""
 
     @staticmethod
     def get(request):
@@ -15,14 +15,19 @@ class AuthView(View):
     @staticmethod
     def post(request):
         form = AuthForm(request.POST)
-        user = authenticate(
-            request, username=form.data["email"].lower(), password=form.data["password"]
-        )
+        if not form.is_valid():
+            return render(
+                request,
+                "user/auth.html",
+                {"form": form, "error": form.errors.as_text()},
+            )
 
-        if user is not None:
-            login(request, user)
-            return redirect("dashboard:index")
-        else:
+        user = authenticate(
+            request,
+            username=form.cleaned_data["email"].lower(),
+            password=form.cleaned_data["password"],
+        )
+        if user is None:
             return render(
                 request,
                 "user/auth.html",
@@ -32,9 +37,12 @@ class AuthView(View):
                 },
             )
 
+        login(request, user)
+        return redirect("dashboard:index")
+
 
 class RegistrationView(View):
-    """Регистрация"""
+    """Register and sign in a user."""
 
     @staticmethod
     def get(request):
@@ -43,20 +51,20 @@ class RegistrationView(View):
     @staticmethod
     def post(request):
         form = RegistrationForm(request.POST)
-        if form.is_valid():
-            user = form.save()
-            login(request, user)
-            return redirect("dashboard:index")
-        else:
+        if not form.is_valid():
             return render(
                 request,
                 "user/registration.html",
-                {"form": form, "error": form.errors["__all__"].data[0].message},
+                {"form": form, "error": form.errors.as_text()},
             )
+
+        user = form.save()
+        login(request, user)
+        return redirect("dashboard:index")
 
 
 class LogoutView(View):
-    """Выход"""
+    """Log out the current user."""
 
     @staticmethod
     def get(request):

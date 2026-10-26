@@ -9,6 +9,7 @@ class ShareSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "figi",
+            "uid",
             "isin",
             "name",
             "ticker",
