@@ -1,11 +1,61 @@
-from tinkoff.invest import Client
+from dataclasses import dataclass
+from datetime import date, datetime
+from decimal import Decimal
+from importlib import import_module
+from typing import Protocol, Sequence
 
-from config.settings import TINKOFF_TOKEN, logger
+from dashboard.models import Share
 
 
-def get_last_data(share):
-    with Client(TINKOFF_TOKEN) as client:
-        resp = client.market_data.get_last_prices(figi=[share.figi])
-        resp = resp.last_prices.pop()
-        logger.info(f"Get last data for share with id {share.id}")
-        return [resp.price.units, resp.time]
+@dataclass(frozen=True)
+class Instrument:
+    figi: str
+    isin: str
+    uid: str
+    ticker: str
+    name: str
+    currency: str
+
+
+@dataclass(frozen=True)
+class Quote:
+    price: Decimal
+    observed_at: datetime
+
+
+@dataclass(frozen=True)
+class HistoricalPrice:
+    time: date
+    close: Decimal
+
+
+class MarketDataProvider(Protocol):
+    def list_instruments(self) -> list[Instrument]: ...
+
+    def get_quotes(self, shares: Sequence[Share]) -> dict[str, Quote]: ...
+
+    def get_history(
+        self, share: Share, days: int = 180
+    ) -> list[HistoricalPrice]: ...
+
+
+def get_market_data_provider() -> MarketDataProvider:
+    from django.conf import settings
+
+    providers = {
+        "moex": "dashboard.services.providers.moex.MoexProvider",
+        "t-invest": "dashboard.services.providers.t_invest.TInvestProvider",
+    }
+    try:
+        module_path, class_name = providers[settings.MARKET_DATA_PROVIDER].rsplit(
+            ".", 1
+        )
+    except KeyError as error:
+        choices = ", ".join(sorted(providers))
+        raise ValueError(
+            f"Unknown MARKET_DATA_PROVIDER {settings.MARKET_DATA_PROVIDER!r}; "
+            f"choose one of: {choices}."
+        ) from error
+
+    provider_class = getattr(import_module(module_path), class_name)
+    return provider_class()

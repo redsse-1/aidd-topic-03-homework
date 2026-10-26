@@ -1,28 +1,39 @@
+import logging
+from decimal import Decimal
+
+from django.utils import timezone
+
 from config.celery import app
 from dashboard.models import Share
-from dashboard.services.market_data import get_last_data
-from config.settings import logger
+from dashboard.services.market_data import get_market_data_provider
+
+logger = logging.getLogger(__name__)
 
 
 @app.task
-def update_last_price():
-    shares = Share.objects.all()
+def update_last_price() -> int:
+    shares = list(Share.objects.all())
+    if not shares:
+        return 0
 
+    quotes = get_market_data_provider().get_quotes(shares)
+    updated_shares = []
     for share in shares:
-        try:
-            [last_price, detetime] = get_last_data(share)
+        quote = quotes.get(share.figi)
+        if quote is None:
+            logger.warning("No market quote returned for %s", share.ticker)
+            continue
 
-            try:
-                if share.last_price > last_price:
-                    is_trend_high = False
-                else:
-                    is_trend_high = True
-            except Exception as e:
-                logger.error(e)
-                is_trend_high = True
+        previous_price = (
+            Decimal(str(share.last_price)) if share.last_price is not None else None
+        )
+        share.is_trend_high = previous_price is None or quote.price >= previous_price
+        share.last_price = quote.price
+        share.updated_at = quote.observed_at or timezone.now()
+        updated_shares.append(share)
 
-            Share.objects.filter(id=share.id).update(
-                last_price=last_price, is_trend_high=is_trend_high
-            )
-        except Exception as e:
-            logger.error(e)
+    if updated_shares:
+        Share.objects.bulk_update(
+            updated_shares, ("last_price", "is_trend_high", "updated_at")
+        )
+    return len(updated_shares)
