@@ -1,0 +1,2 @@
+# Install this optional SDK only when MARKET_DATA_PROVIDER=t-invest.
+tinkoff-investments @ git+https://github.com/Tinkoff/invest-python.git@main
