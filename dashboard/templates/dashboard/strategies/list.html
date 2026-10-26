@@ -1,0 +1,27 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}<title>Симулятор стратегий</title>{% endblock %}
+
+{% block content %}
+    <h2>Мои инвестиционные стратегии</h2>
+    <p><a class="btn btn-primary" href="{% url 'dashboard:strategy-create' %}">Создать стратегию</a></p>
+    {% if strategies %}
+        <table class="table table-striped">
+            <thead>
+            <tr><th>Название</th><th>Акция</th><th>Пороги покупки/продажи</th><th>Результат</th></tr>
+            </thead>
+            <tbody>
+            {% for strategy in strategies %}
+                <tr>
+                    <td><a href="{% url 'dashboard:strategy-detail' strategy.pk %}">{{ strategy.name }}</a></td>
+                    <td>{{ strategy.share.ticker }}</td>
+                    <td>{{ strategy.buy_below }} / {{ strategy.sell_at_or_above }}</td>
+                    <td>{% if strategy.return_percent is not None %}{{ strategy.return_percent }}%{% else %}Не запускалась{% endif %}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>У вас пока нет стратегий.</p>
+    {% endif %}
+{% endblock %}

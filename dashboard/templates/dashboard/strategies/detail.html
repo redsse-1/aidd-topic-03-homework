@@ -1,0 +1,45 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}<title>{{ strategy.name }}</title>{% endblock %}
+
+{% block content %}
+    <h2>{{ strategy.name }} — {{ strategy.share.ticker }}</h2>
+    <p>Начальный капитал: {{ strategy.initial_cash }} {{ strategy.share.currency }}</p>
+    <p>Объём сделки: {{ strategy.quantity }} акций; покупка ≤ {{ strategy.buy_below }}; продажа ≥ {{ strategy.sell_at_or_above }}</p>
+    <p><a class="btn btn-secondary" href="{% url 'dashboard:strategy-update' strategy.pk %}">Изменить параметры</a></p>
+
+    <form method="post" action="{% url 'dashboard:strategy-run' strategy.pk %}">
+        {% csrf_token %}
+        <button class="btn btn-primary" type="submit">Запустить симуляцию по истории</button>
+    </form>
+
+    {% if strategy.last_run_at %}
+        <h3>Результат симуляции до {{ strategy.simulated_until }}</h3>
+        <p>Итоговая стоимость портфеля: {{ strategy.ending_equity }} {{ strategy.share.currency }}</p>
+        <p>Денежный остаток: {{ strategy.ending_cash }} {{ strategy.share.currency }}</p>
+        <p>Открытая позиция: {{ strategy.open_quantity }} акций</p>
+        <p>Доходность: {{ strategy.return_percent }}%</p>
+    {% endif %}
+
+    <h3>Журнал виртуальных операций</h3>
+    {% if strategy.trades.all %}
+        <table class="table table-striped">
+            <thead><tr><th>Дата</th><th>Операция</th><th>Цена</th><th>Количество</th><th>Сумма</th></tr></thead>
+            <tbody>
+            {% for trade in strategy.trades.all %}
+                <tr>
+                    <td>{{ trade.date }}</td>
+                    <td>{{ trade.get_side_display }}</td>
+                    <td>{{ trade.price }}</td>
+                    <td>{{ trade.quantity }}</td>
+                    <td>{{ trade.amount }} {{ strategy.share.currency }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="5">Сделок по заданным условиям нет.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>Сделок пока нет. Запустите симуляцию на накопленной истории цен.</p>
+    {% endif %}
+{% endblock %}

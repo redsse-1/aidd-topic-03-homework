@@ -31,6 +31,9 @@
     <header class="d-flex flex-wrap align-items-center justify-content-center justify-content-md-between py-3 mb-4 border-bottom">
         <ul class="nav col-12 col-md-auto mb-2 justify-content-center mb-md-0">
             <li><a href="{% url 'dashboard:index' %}" class="nav-link px-2 link-secondary">Главная</a></li>
+            {% if user.is_authenticated %}
+                <li><a href="{% url 'dashboard:strategy-list' %}" class="nav-link px-2 link-secondary">Симулятор стратегий</a></li>
+            {% endif %}
         </ul>
 
         <div class="col-md-3 text-end">
@@ -48,6 +51,11 @@
 
 <main class="flex-shrink-0">
     <div class="container">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
 
         {% block content %}
         {% endblock %}

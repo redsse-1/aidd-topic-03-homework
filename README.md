@@ -52,6 +52,18 @@ quote refreshes also keep the current market day updated. The share detail page
 plots stored history and supports 7, 30, 90, 180, 365 days, or all available
 history, including absolute and percentage change for the selected interval.
 
+## Strategy simulator
+
+Authenticated users can create private strategies from the “Симулятор стратегий”
+link. Set initial cash, whole-share trade quantity, a buy-at-or-below price, and
+a sell-at-or-above price. Running a strategy replays the share's stored daily
+closing prices in date order, buys one position when affordable, and sells it
+when the sell threshold is reached. The journal contains virtual operations
+only; the simulation does not send orders to a broker and does not model fees,
+taxes, slippage, dividends, or corporate actions. Results include ending cash,
+the market value of any open position, and return versus initial cash. Load
+price history first with `manage.py load_price_history`.
+
 ISS does not expose FIGI or T-Invest UID. The application stores the stable
 synthetic identifier `MOEX:{BOARDID}:{SECID}` in both `figi` and `uid`, takes
 ISIN from ISS `ISIN`, ticker from `SECID`, name from `SHORTNAME` (falling back
