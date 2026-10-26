@@ -20,6 +20,46 @@ class RegistrationTests(TestCase):
         self.assertEqual(get_user_model().objects.count(), 1)
         self.assertTrue(response.wsgi_request.user.is_authenticated)
 
+    def test_registration_normalizes_email_case(self):
+        response = self.client.post(
+            reverse("user:registration"),
+            {
+                "email": "NewUser@Example.COM",
+                "password1": "long-test-password",
+                "password2": "long-test-password",
+            },
+        )
+
+        self.assertRedirects(response, reverse("dashboard:index"))
+        user = get_user_model().objects.get()
+        self.assertEqual(user.email, "newuser@example.com")
+        self.assertEqual(user.username, "newuser@example.com")
+        self.assertTrue(response.wsgi_request.user.is_authenticated)
+
+    def test_login_accepts_email_with_uppercase_letters(self):
+        get_user_model().objects.create_user(
+            "newuser@example.com", "newuser@example.com", "long-test-password"
+        )
+
+        response = self.client.post(
+            reverse("user:auth"),
+            {"email": "NewUser@Example.COM", "password": "long-test-password"},
+        )
+
+        self.assertRedirects(response, reverse("dashboard:index"))
+        self.assertTrue(response.wsgi_request.user.is_authenticated)
+
+    def test_logout_ends_authenticated_session(self):
+        user = get_user_model().objects.create_user(
+            "newuser@example.com", "newuser@example.com", "long-test-password"
+        )
+        self.client.force_login(user)
+
+        response = self.client.get(reverse("user:logout"))
+
+        self.assertRedirects(response, reverse("dashboard:index"))
+        self.assertFalse(response.wsgi_request.user.is_authenticated)
+
     def test_registration_rejects_duplicate_email_case_insensitively(self):
         get_user_model().objects.create_user(
             "existing@example.com", "existing@example.com", "long-test-password"
