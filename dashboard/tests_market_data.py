@@ -1,11 +1,15 @@
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone as datetime_timezone
 from decimal import Decimal
+from io import StringIO
 from unittest.mock import patch
 
+from django.core.management import call_command
 from django.core.exceptions import ImproperlyConfigured
 from django.test import SimpleTestCase, TestCase, override_settings
+from django.utils import timezone
+from zoneinfo import ZoneInfo
 
-from dashboard.models import Share
+from dashboard.models import Share, SharePriceHistory
 from dashboard.services.graph import get_graph
 from dashboard.services.market_data import (
     HistoricalPrice,
@@ -20,12 +24,10 @@ class MarketDataProviderTests(SimpleTestCase):
     def test_graph_renders_with_current_plotly_api(self):
         share = Share(ticker="SBER")
         history = [
-            HistoricalPrice(date(2026, 10, 23), Decimal("292.32")),
-            HistoricalPrice(date(2026, 10, 26), Decimal("296.1")),
+            SharePriceHistory(date=date(2026, 10, 23), close=Decimal("292.32")),
+            SharePriceHistory(date=date(2026, 10, 26), close=Decimal("296.1")),
         ]
-        with patch("dashboard.services.graph.get_market_data_provider") as factory:
-            factory.return_value.get_history.return_value = history
-            graph = get_graph(share)
+        graph = get_graph(share, history)
 
         self.assertIn("<div", graph)
         self.assertIn("plotly", graph.lower())
@@ -118,7 +120,9 @@ class UpdatePriceTaskTests(TestCase):
             last_price=Decimal("296.10"),
             is_trend_high=False,
         )
-        quote_time = datetime(2026, 10, 26, 10, 0, tzinfo=timezone.utc)
+        quote_time = datetime(
+            2026, 10, 26, 10, 0, tzinfo=datetime_timezone.utc
+        )
         with patch("dashboard.tasks.get_market_data_provider") as provider_factory:
             provider_factory.return_value.get_quotes.return_value = {
                 share.figi: Quote(Decimal("296.123456789"), quote_time)
@@ -131,3 +135,96 @@ class UpdatePriceTaskTests(TestCase):
         self.assertTrue(share.is_trend_high)
         self.assertEqual(share.updated_at, quote_time)
         provider_factory.return_value.get_quotes.assert_called_once()
+        history = SharePriceHistory.objects.get(share=share, date=date(2026, 10, 26))
+        self.assertEqual(history.close, Decimal("296.123456789"))
+
+        with patch("dashboard.tasks.get_market_data_provider") as provider_factory:
+            provider_factory.return_value.get_quotes.return_value = {
+                share.figi: Quote(Decimal("297.00"), quote_time)
+            }
+            update_last_price()
+
+        self.assertEqual(
+            SharePriceHistory.objects.filter(
+                share=share, date=date(2026, 10, 26)
+            ).count(),
+            1,
+        )
+        history.refresh_from_db()
+        self.assertEqual(history.close, Decimal("297.00"))
+
+
+class PriceHistoryFeatureTests(TestCase):
+    def setUp(self):
+        self.share = Share.objects.create(
+            figi="MOEX:TQBR:SBER",
+            isin="RU0009029540",
+            name="Сбербанк",
+            ticker="SBER",
+            currency="rub",
+            uid="MOEX:TQBR:SBER",
+        )
+
+    def test_detail_page_graph_and_change_metrics_use_database_history(self):
+        today = timezone.localdate(timezone.now(), timezone=ZoneInfo("Europe/Moscow"))
+        SharePriceHistory.objects.bulk_create(
+            [
+                SharePriceHistory(
+                    share=self.share,
+                    date=today - timedelta(days=45),
+                    close=Decimal("90"),
+                ),
+                SharePriceHistory(
+                    share=self.share,
+                    date=today - timedelta(days=10),
+                    close=Decimal("100"),
+                ),
+                SharePriceHistory(
+                    share=self.share, date=today, close=Decimal("120")
+                ),
+            ]
+        )
+
+        response = self.client.get(
+            f"/{self.share.pk}?period=30"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["history_count"], 2)
+        self.assertEqual(response.context["absolute_change"], Decimal("20"))
+        self.assertEqual(response.context["percentage_change"], Decimal("20"))
+        self.assertContains(response, "plotly")
+        self.assertContains(response, "20.00%")
+
+    def test_invalid_history_period_is_rejected(self):
+        response = self.client.get(f"/{self.share.pk}?period=invalid")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "Select a valid choice", status_code=400)
+
+    def test_history_command_is_idempotent(self):
+        provider = patch("dashboard.management.commands.load_price_history.get_market_data_provider")
+        provider_factory = provider.start()
+        self.addCleanup(provider.stop)
+        today = timezone.localdate(timezone.now(), timezone=ZoneInfo("Europe/Moscow"))
+        provider_factory.return_value.get_history.return_value = [
+            HistoricalPrice(today - timedelta(days=5), Decimal("250")),
+            HistoricalPrice(today - timedelta(days=5), Decimal("251")),
+            HistoricalPrice(today - timedelta(days=4), Decimal("252")),
+        ]
+        output = StringIO()
+
+        call_command(
+            "load_price_history", "--days", "30", "--ticker", "SBER", stdout=output
+        )
+        call_command(
+            "load_price_history", "--days", "30", "--ticker", "SBER", stdout=output
+        )
+
+        self.assertEqual(SharePriceHistory.objects.filter(share=self.share).count(), 2)
+        self.assertEqual(
+            SharePriceHistory.objects.get(
+                share=self.share, date=today - timedelta(days=5)
+            ).close,
+            Decimal("251"),
+        )

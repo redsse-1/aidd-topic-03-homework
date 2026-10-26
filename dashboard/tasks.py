@@ -4,8 +4,9 @@ from decimal import Decimal
 from django.utils import timezone
 
 from config.celery import app
-from dashboard.models import Share
+from dashboard.models import Share, SharePriceHistory
 from dashboard.services.market_data import get_market_data_provider
+from dashboard.services.price_history import quote_market_date, upsert_price_history
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,7 @@ def update_last_price() -> int:
 
     quotes = get_market_data_provider().get_quotes(shares)
     updated_shares = []
+    history_entries = []
     for share in shares:
         quote = quotes.get(share.figi)
         if quote is None:
@@ -31,9 +33,17 @@ def update_last_price() -> int:
         share.last_price = quote.price
         share.updated_at = quote.observed_at or timezone.now()
         updated_shares.append(share)
+        history_entries.append(
+            SharePriceHistory(
+                share=share,
+                date=quote_market_date(quote.observed_at),
+                close=quote.price,
+            )
+        )
 
     if updated_shares:
         Share.objects.bulk_update(
             updated_shares, ("last_price", "is_trend_high", "updated_at")
         )
+        upsert_price_history(history_entries)
     return len(updated_shares)

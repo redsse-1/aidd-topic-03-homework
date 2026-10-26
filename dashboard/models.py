@@ -25,3 +25,30 @@ class Share(models.Model):
     class Meta:
         verbose_name = "Акция"
         verbose_name_plural = "Акции"
+
+
+class SharePriceHistory(models.Model):
+    share = models.ForeignKey(
+        Share,
+        on_delete=models.CASCADE,
+        related_name="price_history",
+        verbose_name="Акция",
+    )
+    date = models.DateField(verbose_name="Дата")
+    close = models.DecimalField(
+        max_digits=20, decimal_places=9, verbose_name="Цена закрытия"
+    )
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
+
+    class Meta:
+        ordering = ("date",)
+        verbose_name = "История цены"
+        verbose_name_plural = "История цен"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("share", "date"), name="unique_share_price_history_date"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.share.ticker} {self.date}: {self.close}"

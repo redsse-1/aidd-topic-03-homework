@@ -22,6 +22,7 @@ Start PostgreSQL and Redis, then initialize the database and import shares:
 docker compose up -d
 .\.venv\Scripts\python.exe manage.py migrate
 .\.venv\Scripts\python.exe manage.py add_shares
+.\.venv\Scripts\python.exe manage.py load_price_history --days 365
 ```
 
 Run the web application and Celery processes in separate PowerShell windows:
@@ -44,6 +45,12 @@ deliberate interval aligned with delayed ISS quotes that avoids unnecessary
 requests while keeping displayed prices reasonably current.
 When ISS reports that the board is not trading, the provider uses the latest
 closing price instead of the stale intraday quote.
+`load_price_history` backfills daily candles (default: 365 calendar days); use
+`--ticker SBER` to load one instrument. The command is safe to rerun: each
+instrument/date pair is unique and existing daily rows are updated. Scheduled
+quote refreshes also keep the current market day updated. The share detail page
+plots stored history and supports 7, 30, 90, 180, 365 days, or all available
+history, including absolute and percentage change for the selected interval.
 
 ISS does not expose FIGI or T-Invest UID. The application stores the stable
 synthetic identifier `MOEX:{BOARDID}:{SECID}` in both `figi` and `uid`, takes

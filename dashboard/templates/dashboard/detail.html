@@ -15,18 +15,35 @@
     <div class="col3"></div>
     </div>
 
-
-      <div class="row mt-3">
-    <div class="col3"></div>
-    <div class="col3">
-    <h5>Исторические данные: </h5>
- {% autoescape off %}
-  {{ plot_div }}
-  {% endautoescape %}
+    <div class="row mt-3">
+        <div class="col-12">
+            <h5>История изменения рыночных цен</h5>
+            <form method="get" class="form-inline mb-3">
+                {{ history_form.period.label_tag }}
+                {{ history_form.period }}
+                <button type="submit" class="btn btn-primary ml-2">Показать</button>
+                {% for error in history_form.period.errors %}
+                    <span class="text-danger ml-2">{{ error }}</span>
+                {% endfor %}
+            </form>
+            {% if history_count %}
+                <p>
+                    Первая цена: {{ first_price.close }} {{ share.currency }} ({{ first_price.date }})<br>
+                    Последняя цена: {{ last_price.close }} {{ share.currency }} ({{ last_price.date }})<br>
+                    Изменение: {{ absolute_change|floatformat:9 }} {{ share.currency }}
+                    {% if percentage_change is not None %}
+                        ({{ percentage_change|floatformat:2 }}%)
+                    {% else %}
+                        (процентное изменение не рассчитывается от нулевой цены)
+                    {% endif %}
+                </p>
+                {% autoescape off %}
+                    {{ plot_div }}
+                {% endautoescape %}
+            {% else %}
+                <p>За выбранный период накопленных цен нет. Историю можно заполнить командой <code>load_price_history</code>.</p>
+            {% endif %}
+        </div>
     </div>
-    <div class="col3"></div>
-    </div>
-
-
 
 {% endblock %}
