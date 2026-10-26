@@ -109,10 +109,10 @@ class MoexProvider:
                 candidates = (quote.get("LCURRENTPRICE"), quote.get("LAST"))
             else:
                 candidates = (
+                    quote.get("LAST"),
                     quote.get("LCLOSEPRICE"),
                     quote.get("CLOSEPRICE"),
                     previous_prices.get(share.ticker),
-                    quote.get("LAST"),
                 )
             price = next(
                 (

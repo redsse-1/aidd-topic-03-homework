@@ -96,7 +96,7 @@ class MarketDataProviderTests(SimpleTestCase):
             quotes = provider.get_quotes(shares)
 
         self.assertEqual(quotes["MOEX:TQBR:SBER"].price, Decimal("296.01"))
-        self.assertEqual(quotes["MOEX:TQBR:GAZP"].price, Decimal("112.57"))
+        self.assertEqual(quotes["MOEX:TQBR:GAZP"].price, Decimal("114.66"))
         get_json.assert_called_once()
 
     @override_settings(MARKET_DATA_PROVIDER="t-invest", TINVEST_TOKEN="")
