@@ -204,3 +204,89 @@ class PriceNotification(models.Model):
 
     def __str__(self):
         return self.message
+
+
+class InvestmentPortfolio(models.Model):
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="investment_portfolios",
+    )
+    name = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("name", "id")
+        verbose_name = "Инвестиционный портфель"
+        verbose_name_plural = "Инвестиционные портфели"
+
+    def __str__(self):
+        return f"{self.name} ({self.owner})"
+
+
+class PortfolioPosition(models.Model):
+    portfolio = models.ForeignKey(
+        InvestmentPortfolio, on_delete=models.CASCADE, related_name="positions"
+    )
+    share = models.ForeignKey(
+        Share, on_delete=models.PROTECT, related_name="portfolio_positions"
+    )
+    quantity = models.DecimalField(max_digits=20, decimal_places=9, default=0)
+    average_cost = models.DecimalField(max_digits=20, decimal_places=9, default=0)
+    realized_profit = models.DecimalField(max_digits=20, decimal_places=2, default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("share__ticker",)
+        verbose_name = "Позиция портфеля"
+        verbose_name_plural = "Позиции портфеля"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("portfolio", "share"), name="unique_portfolio_share"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(quantity__gte=0),
+                name="portfolio_position_nonnegative_quantity",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.portfolio.name}: {self.share.ticker} ({self.quantity})"
+
+
+class PortfolioTransaction(models.Model):
+    class Side(models.TextChoices):
+        BUY = "buy", "Покупка"
+        SELL = "sell", "Продажа"
+
+    portfolio = models.ForeignKey(
+        InvestmentPortfolio, on_delete=models.CASCADE, related_name="transactions"
+    )
+    share = models.ForeignKey(
+        Share, on_delete=models.PROTECT, related_name="portfolio_transactions"
+    )
+    side = models.CharField(max_length=4, choices=Side.choices)
+    quantity = models.DecimalField(max_digits=20, decimal_places=9)
+    price = models.DecimalField(max_digits=20, decimal_places=9)
+    amount = models.DecimalField(max_digits=20, decimal_places=2)
+    realized_profit = models.DecimalField(max_digits=20, decimal_places=2, default=0)
+    executed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-executed_at", "-id")
+        verbose_name = "Операция портфеля"
+        verbose_name_plural = "Операции портфеля"
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(quantity__gt=0),
+                name="portfolio_transaction_positive_quantity",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(price__gt=0),
+                name="portfolio_transaction_positive_price",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.get_side_display()} {self.share.ticker} x {self.quantity}"

@@ -76,6 +76,17 @@ so a subsequent crossing can notify again. Missing quotes (including times when
 the provider has no new market data) do not generate alerts. Notifications are
 private to the watchlist owner.
 
+## Virtual investment portfolios
+
+Authenticated users can create private portfolios and perform virtual buy/sell
+operations at the current price stored for each share. Positions show quantity,
+weighted average acquisition price, current market value, realized profit/loss,
+and unrealized profit/loss. Operations are kept in a portfolio journal. Values
+are summarized by currency; currencies are not combined using an implicit
+exchange rate. Sales beyond the held quantity, non-positive quantities, and
+shares without a current price are rejected. No broker orders or cash account
+are involved.
+
 ISS does not expose FIGI or T-Invest UID. The application stores the stable
 synthetic identifier `MOEX:{BOARDID}:{SECID}` in both `figi` and `uid`, takes
 ISIN from ISS `ISIN`, ticker from `SECID`, name from `SHORTNAME` (falling back

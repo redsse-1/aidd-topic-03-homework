@@ -1,5 +1,5 @@
 from datetime import timedelta
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from zoneinfo import ZoneInfo
 
 from django.contrib import messages
@@ -19,7 +19,9 @@ from django.views.generic import (
 
 from .forms import (
     InvestmentStrategyForm,
+    InvestmentPortfolioForm,
     PriceHistoryPeriodForm,
+    PortfolioTransactionForm,
     ShareModelForm,
     WatchlistEntryForm,
     WatchlistEntryTargetForm,
@@ -27,12 +29,16 @@ from .forms import (
 )
 from .models import (
     InvestmentStrategy,
+    InvestmentPortfolio,
+    PortfolioPosition,
+    PortfolioTransaction,
     PriceNotification,
     Share,
     Watchlist,
     WatchlistEntry,
 )
 from .services.graph import get_graph
+from .services.portfolio import PortfolioOperationError, execute_portfolio_transaction
 from .services.strategy_simulator import NoPriceHistoryError, run_strategy
 
 MOSCOW = ZoneInfo("Europe/Moscow")
@@ -298,6 +304,180 @@ class PriceNotificationReadView(LoginRequiredMixin, View):
         notification.is_read = True
         notification.save(update_fields=("is_read",))
         return redirect("dashboard:notifications")
+
+
+class InvestmentPortfolioListView(LoginRequiredMixin, ListView):
+    model = InvestmentPortfolio
+    template_name = "dashboard/portfolios/list.html"
+    context_object_name = "portfolios"
+
+    def get_queryset(self):
+        return InvestmentPortfolio.objects.filter(owner=self.request.user).prefetch_related(
+            "positions__share"
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.setdefault("form", InvestmentPortfolioForm())
+        for portfolio in context["portfolios"]:
+            currencies = {}
+            for position in portfolio.positions.all():
+                currency = position.share.currency
+                summary = currencies.setdefault(
+                    currency,
+                    {
+                        "currency": currency,
+                        "value": Decimal("0"),
+                        "fully_priced": True,
+                    },
+                )
+                if position.quantity == 0:
+                    continue
+                price = position.share.last_price
+                if price is None or price <= 0:
+                    summary["fully_priced"] = False
+                else:
+                    summary["value"] += position.quantity * price
+            portfolio.currency_summaries = [
+                {
+                    **summary,
+                    "value_available": summary["fully_priced"],
+                    "value": summary["value"].quantize(
+                        Decimal("0.01"), rounding=ROUND_HALF_UP
+                    )
+                    if summary["fully_priced"]
+                    else None,
+                }
+                for summary in currencies.values()
+            ]
+        return context
+
+    def post(self, request, *args, **kwargs):
+        form = InvestmentPortfolioForm(request.POST)
+        if form.is_valid():
+            portfolio = form.save(commit=False)
+            portfolio.owner = request.user
+            portfolio.save()
+            return redirect("dashboard:portfolio-detail", pk=portfolio.pk)
+        self.object_list = self.get_queryset()
+        return self.render_to_response(self.get_context_data(form=form))
+
+
+class InvestmentPortfolioDetailView(LoginRequiredMixin, DetailView):
+    model = InvestmentPortfolio
+    template_name = "dashboard/portfolios/detail.html"
+    context_object_name = "portfolio"
+
+    def get_queryset(self):
+        return (
+            InvestmentPortfolio.objects.filter(owner=self.request.user)
+            .prefetch_related("positions__share", "transactions__share")
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        positions = []
+        currency_summaries = {}
+
+        for position in self.object.positions.all():
+            currency = position.share.currency
+            summary = currency_summaries.setdefault(
+                currency,
+                {
+                    "currency": currency,
+                    "market_value": Decimal("0"),
+                    "realized_profit": Decimal("0"),
+                    "unrealized_profit": Decimal("0"),
+                    "fully_priced": True,
+                },
+            )
+            summary["realized_profit"] += position.realized_profit
+            if position.quantity == 0:
+                continue
+            price = position.share.last_price
+            if price is None or price <= 0:
+                summary["fully_priced"] = False
+                positions.append(
+                    {
+                        "position": position,
+                        "market_value": None,
+                        "unrealized_profit": None,
+                        "price_available": False,
+                    }
+                )
+                continue
+            position_value = (position.quantity * price).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+            position_profit = (
+                (price - position.average_cost) * position.quantity
+            ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            summary["market_value"] += position_value
+            summary["unrealized_profit"] += position_profit
+            positions.append(
+                {
+                    "position": position,
+                    "market_value": position_value,
+                    "unrealized_profit": position_profit,
+                    "price_available": True,
+                }
+            )
+
+        context["positions"] = positions
+        context["currency_summaries"] = []
+        for summary in currency_summaries.values():
+            summary["market_value"] = (
+                summary["market_value"].quantize(
+                    Decimal("0.01"), rounding=ROUND_HALF_UP
+                )
+                if summary["fully_priced"]
+                else None
+            )
+            summary["value_available"] = summary["fully_priced"]
+            summary["realized_profit"] = summary["realized_profit"].quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+            summary["unrealized_profit"] = (
+                summary["unrealized_profit"].quantize(
+                    Decimal("0.01"), rounding=ROUND_HALF_UP
+                )
+                if summary["fully_priced"]
+                else None
+            )
+            summary["unrealized_available"] = summary["fully_priced"]
+            summary["total_profit"] = (
+                summary["realized_profit"] + summary["unrealized_profit"]
+                if summary["unrealized_profit"] is not None
+                else None
+            )
+            summary["total_available"] = summary["fully_priced"]
+            context["currency_summaries"].append(summary)
+        context.setdefault("transaction_form", PortfolioTransactionForm())
+        context["transactions"] = self.object.transactions.select_related(
+            "share"
+        ).all()
+        return context
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        form = PortfolioTransactionForm(request.POST)
+        if form.is_valid():
+            try:
+                execute_portfolio_transaction(
+                    portfolio_id=self.object.pk,
+                    owner_id=request.user.pk,
+                    share_id=form.cleaned_data["share"].pk,
+                    side=form.cleaned_data["side"],
+                    quantity=form.cleaned_data["quantity"],
+                )
+            except PortfolioOperationError as error:
+                form.add_error(None, str(error))
+            else:
+                messages.success(request, "Виртуальная операция сохранена.")
+                return redirect("dashboard:portfolio-detail", pk=self.object.pk)
+        return self.render_to_response(
+            self.get_context_data(transaction_form=form)
+        )
 
 
 class ShareUpdateView(IsUserAuthenticatedMixin, UpdateView):

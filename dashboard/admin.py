@@ -8,6 +8,9 @@ from dashboard.models import (
     PriceNotification,
     Watchlist,
     WatchlistEntry,
+    InvestmentPortfolio,
+    PortfolioPosition,
+    PortfolioTransaction,
 )
 
 
@@ -70,3 +73,31 @@ class PriceNotificationAdmin(admin.ModelAdmin):
     list_display = ("entry", "triggered_price", "triggered_at", "is_read")
     list_filter = ("is_read", "triggered_at")
     search_fields = ("entry__watchlist__owner__email", "entry__share__ticker")
+
+
+@admin.register(InvestmentPortfolio)
+class InvestmentPortfolioAdmin(admin.ModelAdmin):
+    list_display = ("name", "owner", "created_at", "updated_at")
+    search_fields = ("name", "owner__email")
+
+
+@admin.register(PortfolioPosition)
+class PortfolioPositionAdmin(admin.ModelAdmin):
+    list_display = ("portfolio", "share", "quantity", "average_cost", "realized_profit")
+    search_fields = ("portfolio__name", "portfolio__owner__email", "share__ticker")
+
+
+@admin.register(PortfolioTransaction)
+class PortfolioTransactionAdmin(admin.ModelAdmin):
+    list_display = (
+        "portfolio",
+        "share",
+        "side",
+        "quantity",
+        "price",
+        "amount",
+        "realized_profit",
+        "executed_at",
+    )
+    list_filter = ("side", "executed_at")
+    search_fields = ("portfolio__name", "portfolio__owner__email", "share__ticker")

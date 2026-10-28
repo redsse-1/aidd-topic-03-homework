@@ -1,0 +1,79 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}<title>{{ portfolio.name }}</title>{% endblock %}
+
+{% block content %}
+    <h2>{{ portfolio.name }}</h2>
+
+    <h3>Оценка портфеля</h3>
+    {% if currency_summaries %}
+        <table class="table table-sm">
+            <thead><tr><th>Валюта</th><th>Текущая стоимость</th><th>Реализованная прибыль/убыток</th><th>Нереализованная прибыль/убыток</th><th>Итого</th></tr></thead>
+            <tbody>
+            {% for summary in currency_summaries %}
+                <tr>
+                    <td>{{ summary.currency }}</td>
+                    <td>{% if summary.value_available %}{{ summary.market_value }}{% else %}Недоступна: нет текущей цены{% endif %}</td>
+                    <td>{{ summary.realized_profit }}</td>
+                    <td>{% if summary.unrealized_available %}{{ summary.unrealized_profit }}{% else %}Недоступна{% endif %}</td>
+                    <td>{% if summary.total_available %}{{ summary.total_profit }}{% else %}Недоступен{% endif %}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>В портфеле пока нет операций.</p>
+    {% endif %}
+
+    <h3>Позиции</h3>
+    {% if positions %}
+        <table class="table table-striped">
+            <thead><tr><th>Тикер</th><th>Количество</th><th>Средняя цена</th><th>Текущая цена</th><th>Стоимость</th><th>Нереализованный P/L</th><th>Реализованный P/L</th></tr></thead>
+            <tbody>
+            {% for row in positions %}
+                <tr>
+                    <td>{{ row.position.share.ticker }}</td>
+                    <td>{{ row.position.quantity }}</td>
+                    <td>{{ row.position.average_cost }}</td>
+                    <td>{{ row.position.share.last_price|default:"—" }}</td>
+                    <td>{% if row.price_available %}{{ row.market_value }} {{ row.position.share.currency }}{% else %}—{% endif %}</td>
+                    <td>{% if row.price_available %}{{ row.unrealized_profit }} {{ row.position.share.currency }}{% else %}—{% endif %}</td>
+                    <td>{{ row.position.realized_profit }} {{ row.position.share.currency }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>Открытых и закрытых позиций пока нет.</p>
+    {% endif %}
+
+    <h3>Виртуальная покупка или продажа</h3>
+    <p>Операция исполнится по текущей цене акции, сохранённой приложением.</p>
+    <form method="post">
+        {% csrf_token %}
+        {{ transaction_form.as_p }}
+        <button class="btn btn-primary" type="submit">Выполнить операцию</button>
+    </form>
+
+    <h3 class="mt-4">История операций</h3>
+    {% if transactions %}
+        <table class="table table-striped">
+            <thead><tr><th>Дата и время</th><th>Операция</th><th>Акция</th><th>Количество</th><th>Цена</th><th>Сумма</th><th>Реализованный P/L</th></tr></thead>
+            <tbody>
+            {% for transaction in transactions %}
+                <tr>
+                    <td>{{ transaction.executed_at }}</td>
+                    <td>{{ transaction.get_side_display }}</td>
+                    <td>{{ transaction.share.ticker }}</td>
+                    <td>{{ transaction.quantity }}</td>
+                    <td>{{ transaction.price }} {{ transaction.share.currency }}</td>
+                    <td>{{ transaction.amount }} {{ transaction.share.currency }}</td>
+                    <td>{{ transaction.realized_profit }} {{ transaction.share.currency }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>Операций пока нет.</p>
+    {% endif %}
+{% endblock %}

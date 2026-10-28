@@ -1,6 +1,15 @@
+from decimal import Decimal
+
 from django import forms
 
-from .models import InvestmentStrategy, Share, Watchlist, WatchlistEntry
+from .models import (
+    InvestmentPortfolio,
+    InvestmentStrategy,
+    PortfolioTransaction,
+    Share,
+    Watchlist,
+    WatchlistEntry,
+)
 
 
 class PriceHistoryPeriodForm(forms.Form):
@@ -119,3 +128,36 @@ class WatchlistEntryTargetForm(forms.ModelForm):
         if target_price <= 0:
             raise forms.ValidationError("Целевой уровень должен быть больше нуля.")
         return target_price
+
+
+class InvestmentPortfolioForm(forms.ModelForm):
+    class Meta:
+        model = InvestmentPortfolio
+        fields = ("name",)
+        widgets = {"name": forms.TextInput(attrs={"class": "form-control"})}
+
+
+class PortfolioTransactionForm(forms.Form):
+    side = forms.ChoiceField(
+        label="Операция",
+        choices=PortfolioTransaction.Side.choices,
+        widget=forms.Select(attrs={"class": "form-control"}),
+    )
+    share = forms.ModelChoiceField(
+        label="Акция",
+        queryset=Share.objects.none(),
+        widget=forms.Select(attrs={"class": "form-control"}),
+    )
+    quantity = forms.DecimalField(
+        label="Количество",
+        min_value=Decimal("0.000000001"),
+        max_digits=20,
+        decimal_places=9,
+        widget=forms.NumberInput(
+            attrs={"class": "form-control", "min": "0.000000001", "step": "any"}
+        ),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["share"].queryset = Share.objects.order_by("ticker")

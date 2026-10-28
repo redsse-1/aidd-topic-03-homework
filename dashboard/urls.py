@@ -18,6 +18,8 @@ from dashboard.views import (
     WatchlistEntryDeleteView,
     WatchlistEntryUpdateView,
     WatchlistListView,
+    InvestmentPortfolioDetailView,
+    InvestmentPortfolioListView,
 )
 
 app_name = "dashboard"
@@ -71,6 +73,12 @@ urlpatterns = [
         "notifications/<int:pk>/read/",
         PriceNotificationReadView.as_view(),
         name="notification-read",
+    ),
+    path("portfolios/", InvestmentPortfolioListView.as_view(), name="portfolio-list"),
+    path(
+        "portfolios/<int:pk>/",
+        InvestmentPortfolioDetailView.as_view(),
+        name="portfolio-detail",
     ),
     path("api/", include("dashboard.api.urls")),
 ]
