@@ -1,0 +1,13 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}<title>Изменить целевой уровень</title>{% endblock %}
+
+{% block content %}
+    <h2>Целевой уровень {{ object.share.ticker }}</h2>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button class="btn btn-primary" type="submit">Сохранить</button>
+        <a class="btn btn-secondary" href="{% url 'dashboard:watchlist-detail' object.watchlist_id %}">Отмена</a>
+    </form>
+{% endblock %}

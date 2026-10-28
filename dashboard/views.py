@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
@@ -16,8 +17,21 @@ from django.views.generic import (
     UpdateView,
 )
 
-from .forms import InvestmentStrategyForm, PriceHistoryPeriodForm, ShareModelForm
-from .models import InvestmentStrategy, Share
+from .forms import (
+    InvestmentStrategyForm,
+    PriceHistoryPeriodForm,
+    ShareModelForm,
+    WatchlistEntryForm,
+    WatchlistEntryTargetForm,
+    WatchlistForm,
+)
+from .models import (
+    InvestmentStrategy,
+    PriceNotification,
+    Share,
+    Watchlist,
+    WatchlistEntry,
+)
 from .services.graph import get_graph
 from .services.strategy_simulator import NoPriceHistoryError, run_strategy
 
@@ -156,6 +170,134 @@ class StrategyRunView(LoginRequiredMixin, View):
         else:
             messages.success(request, "Симуляция завершена по накопленной истории цен.")
         return redirect("dashboard:strategy-detail", pk=strategy.pk)
+
+
+class WatchlistListView(LoginRequiredMixin, ListView):
+    model = Watchlist
+    template_name = "dashboard/watchlists/list.html"
+    context_object_name = "watchlists"
+
+    def get_queryset(self):
+        return Watchlist.objects.filter(owner=self.request.user).prefetch_related(
+            "entries"
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.setdefault("form", WatchlistForm())
+        return context
+
+    def post(self, request, *args, **kwargs):
+        form = WatchlistForm(request.POST)
+        if form.is_valid():
+            watchlist = form.save(commit=False)
+            watchlist.owner = request.user
+            watchlist.save()
+            return redirect("dashboard:watchlist-detail", pk=watchlist.pk)
+        self.object_list = self.get_queryset()
+        return self.render_to_response(self.get_context_data(form=form))
+
+
+class WatchlistDetailView(LoginRequiredMixin, DetailView):
+    model = Watchlist
+    template_name = "dashboard/watchlists/detail.html"
+    context_object_name = "watchlist"
+
+    def get_queryset(self):
+        return Watchlist.objects.filter(owner=self.request.user).prefetch_related(
+            "entries__share"
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.setdefault("entry_form", WatchlistEntryForm())
+        return context
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        form = WatchlistEntryForm(request.POST)
+        if form.is_valid():
+            entry = form.save(commit=False)
+            entry.watchlist = self.object
+            if WatchlistEntry.objects.filter(
+                watchlist=self.object, share=entry.share
+            ).exists():
+                form.add_error("share", "Эта акция уже есть в списке наблюдения.")
+            else:
+                try:
+                    with transaction.atomic():
+                        entry.save()
+                except IntegrityError:
+                    form.add_error(
+                        "share", "Эта акция уже есть в списке наблюдения."
+                    )
+                else:
+                    messages.success(request, "Акция добавлена в список наблюдения.")
+                    return redirect("dashboard:watchlist-detail", pk=self.object.pk)
+        return self.render_to_response(self.get_context_data(entry_form=form))
+
+
+class WatchlistEntryDeleteView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        entry = get_object_or_404(
+            WatchlistEntry,
+            pk=pk,
+            watchlist__owner=request.user,
+        )
+        watchlist_id = entry.watchlist_id
+        entry.delete()
+        return redirect("dashboard:watchlist-detail", pk=watchlist_id)
+
+
+class WatchlistDeleteView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        watchlist = get_object_or_404(Watchlist, pk=pk, owner=request.user)
+        watchlist.delete()
+        return redirect("dashboard:watchlist-list")
+
+
+class WatchlistEntryUpdateView(LoginRequiredMixin, UpdateView):
+    model = WatchlistEntry
+    form_class = WatchlistEntryTargetForm
+    template_name = "dashboard/watchlists/entry_form.html"
+    http_method_names = ("get", "post", "head", "options")
+
+    def get_queryset(self):
+        return WatchlistEntry.objects.filter(watchlist__owner=self.request.user)
+
+    def form_valid(self, form):
+        if {"direction", "target_price"} & set(form.changed_data):
+            form.instance.is_triggered = False
+            form.instance.last_checked_price = None
+            form.instance.last_checked_at = None
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse("dashboard:watchlist-detail", args=[self.object.watchlist_id])
+
+
+class PriceNotificationListView(LoginRequiredMixin, ListView):
+    model = PriceNotification
+    template_name = "dashboard/watchlists/notifications.html"
+    context_object_name = "notifications"
+    paginate_by = 50
+
+    def get_queryset(self):
+        return PriceNotification.objects.filter(
+            entry__watchlist__owner=self.request.user
+        ).select_related("entry__share", "entry__watchlist")
+
+
+class PriceNotificationReadView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        notification = get_object_or_404(
+            PriceNotification,
+            pk=pk,
+            entry__watchlist__owner=request.user,
+        )
+        notification.is_read = True
+        notification.save(update_fields=("is_read",))
+        return redirect("dashboard:notifications")
 
 
 class ShareUpdateView(IsUserAuthenticatedMixin, UpdateView):

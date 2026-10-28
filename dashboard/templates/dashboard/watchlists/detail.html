@@ -1,0 +1,43 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}<title>{{ watchlist.name }}</title>{% endblock %}
+
+{% block content %}
+    <h2>{{ watchlist.name }}</h2>
+    <h3>Добавить акцию и целевой уровень</h3>
+    <form method="post">
+        {% csrf_token %}
+        {{ entry_form.as_p }}
+        <button class="btn btn-primary" type="submit">Добавить в наблюдение</button>
+    </form>
+
+    <h3 class="mt-4">Наблюдаемые акции</h3>
+    {% if watchlist.entries.all %}
+        <table class="table table-striped">
+            <thead>
+            <tr><th>Тикер</th><th>Текущая цена</th><th>Условие</th><th>Состояние</th><th></th></tr>
+            </thead>
+            <tbody>
+            {% for entry in watchlist.entries.all %}
+                <tr>
+                    <td>{{ entry.share.ticker }}</td>
+                    <td>{{ entry.share.last_price|default:"—" }}</td>
+                    <td>{{ entry.get_direction_display }} {{ entry.target_price }}</td>
+                    <td>{% if entry.is_triggered %}Уровень достигнут{% else %}Ожидание{% endif %}</td>
+                    <td>
+                        <a class="btn btn-sm btn-secondary" href="{% url 'dashboard:watchlist-entry-update' entry.pk %}">Изменить уровень</a>
+                        <form method="post" action="{% url 'dashboard:watchlist-entry-delete' entry.pk %}">
+                            {% csrf_token %}
+                            <button class="btn btn-sm btn-danger" type="submit">Удалить</button>
+                        </form>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="5">Список пока пуст.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>Список пока пуст.</p>
+    {% endif %}
+{% endblock %}

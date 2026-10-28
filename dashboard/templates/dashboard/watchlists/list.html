@@ -1,0 +1,28 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}<title>Мои списки наблюдения</title>{% endblock %}
+
+{% block content %}
+    <h2>Мои списки наблюдения</h2>
+    <form method="post" class="mb-3">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button class="btn btn-primary" type="submit">Создать список</button>
+    </form>
+    {% if watchlists %}
+        <ul class="list-group">
+            {% for watchlist in watchlists %}
+                <li class="list-group-item">
+                    <a href="{% url 'dashboard:watchlist-detail' watchlist.pk %}">{{ watchlist.name }}</a>
+                    <span class="badge badge-secondary">{{ watchlist.entries.count }} акций</span>
+                    <form method="post" action="{% url 'dashboard:watchlist-delete' watchlist.pk %}" class="d-inline">
+                        {% csrf_token %}
+                        <button class="btn btn-sm btn-danger" type="submit">Удалить список</button>
+                    </form>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>Создайте список, чтобы наблюдать за целевыми ценами акций.</p>
+    {% endif %}
+{% endblock %}

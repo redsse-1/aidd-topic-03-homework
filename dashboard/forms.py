@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import InvestmentStrategy, Share
+from .models import InvestmentStrategy, Share, Watchlist, WatchlistEntry
 
 
 class PriceHistoryPeriodForm(forms.Form):
@@ -75,3 +75,47 @@ class InvestmentStrategyForm(forms.ModelForm):
                 "Цена продажи должна быть выше цены покупки.",
             )
         return cleaned_data
+
+
+class WatchlistForm(forms.ModelForm):
+    class Meta:
+        model = Watchlist
+        fields = ("name",)
+        widgets = {"name": forms.TextInput(attrs={"class": "form-control"})}
+
+
+class WatchlistEntryForm(forms.ModelForm):
+    class Meta:
+        model = WatchlistEntry
+        fields = ("share", "direction", "target_price")
+        widgets = {
+            "share": forms.Select(attrs={"class": "form-control"}),
+            "direction": forms.Select(attrs={"class": "form-control"}),
+            "target_price": forms.NumberInput(
+                attrs={"class": "form-control", "min": "0.000000001", "step": "any"}
+            ),
+        }
+
+    def clean_target_price(self):
+        target_price = self.cleaned_data["target_price"]
+        if target_price <= 0:
+            raise forms.ValidationError("Целевой уровень должен быть больше нуля.")
+        return target_price
+
+
+class WatchlistEntryTargetForm(forms.ModelForm):
+    class Meta:
+        model = WatchlistEntry
+        fields = ("direction", "target_price")
+        widgets = {
+            "direction": forms.Select(attrs={"class": "form-control"}),
+            "target_price": forms.NumberInput(
+                attrs={"class": "form-control", "min": "0.000000001", "step": "any"}
+            ),
+        }
+
+    def clean_target_price(self):
+        target_price = self.cleaned_data["target_price"]
+        if target_price <= 0:
+            raise forms.ValidationError("Целевой уровень должен быть больше нуля.")
+        return target_price

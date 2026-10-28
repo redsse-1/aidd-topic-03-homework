@@ -131,3 +131,76 @@ class SimulatedTrade(models.Model):
 
     def __str__(self):
         return f"{self.get_side_display()} {self.strategy.share.ticker} {self.date}"
+
+
+class Watchlist(models.Model):
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="watchlists",
+    )
+    name = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("name", "id")
+        verbose_name = "Список наблюдения"
+        verbose_name_plural = "Списки наблюдения"
+
+    def __str__(self):
+        return f"{self.name} ({self.owner})"
+
+
+class WatchlistEntry(models.Model):
+    class Direction(models.TextChoices):
+        AT_OR_ABOVE = "above", "Достигла или выше"
+        AT_OR_BELOW = "below", "Достигла или ниже"
+
+    watchlist = models.ForeignKey(
+        Watchlist, on_delete=models.CASCADE, related_name="entries"
+    )
+    share = models.ForeignKey(
+        Share, on_delete=models.CASCADE, related_name="watchlist_entries"
+    )
+    direction = models.CharField(max_length=5, choices=Direction.choices)
+    target_price = models.DecimalField(max_digits=20, decimal_places=9)
+    is_triggered = models.BooleanField(default=False)
+    last_checked_price = models.DecimalField(
+        max_digits=20, decimal_places=9, null=True, blank=True
+    )
+    last_checked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("share__ticker",)
+        verbose_name = "Наблюдаемая акция"
+        verbose_name_plural = "Наблюдаемые акции"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("watchlist", "share"), name="unique_watchlist_share"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(target_price__gt=0),
+                name="watchlist_target_price_positive",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.share.ticker} {self.get_direction_display()} {self.target_price}"
+
+
+class PriceNotification(models.Model):
+    entry = models.ForeignKey(
+        WatchlistEntry, on_delete=models.CASCADE, related_name="notifications"
+    )
+    triggered_price = models.DecimalField(max_digits=20, decimal_places=9)
+    triggered_at = models.DateTimeField()
+    message = models.CharField(max_length=255)
+    is_read = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ("-triggered_at", "-id")
+        verbose_name = "Уведомление о цене"
+        verbose_name_plural = "Уведомления о цене"
+
+    def __str__(self):
+        return self.message

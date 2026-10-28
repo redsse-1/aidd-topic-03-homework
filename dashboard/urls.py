@@ -11,6 +11,13 @@ from dashboard.views import (
     StrategyRunView,
     StrategyUpdateView,
     ShareUpdateView,
+    PriceNotificationListView,
+    PriceNotificationReadView,
+    WatchlistDetailView,
+    WatchlistDeleteView,
+    WatchlistEntryDeleteView,
+    WatchlistEntryUpdateView,
+    WatchlistListView,
 )
 
 app_name = "dashboard"
@@ -37,6 +44,33 @@ urlpatterns = [
         "strategies/<int:pk>/run/",
         StrategyRunView.as_view(),
         name="strategy-run",
+    ),
+    path("watchlists/", WatchlistListView.as_view(), name="watchlist-list"),
+    path(
+        "watchlists/<int:pk>/",
+        WatchlistDetailView.as_view(),
+        name="watchlist-detail",
+    ),
+    path(
+        "watchlists/<int:pk>/delete/",
+        WatchlistDeleteView.as_view(),
+        name="watchlist-delete",
+    ),
+    path(
+        "watchlist-entries/<int:pk>/edit/",
+        WatchlistEntryUpdateView.as_view(),
+        name="watchlist-entry-update",
+    ),
+    path(
+        "watchlist-entries/<int:pk>/delete/",
+        WatchlistEntryDeleteView.as_view(),
+        name="watchlist-entry-delete",
+    ),
+    path("notifications/", PriceNotificationListView.as_view(), name="notifications"),
+    path(
+        "notifications/<int:pk>/read/",
+        PriceNotificationReadView.as_view(),
+        name="notification-read",
     ),
     path("api/", include("dashboard.api.urls")),
 ]

@@ -64,6 +64,18 @@ taxes, slippage, dividends, or corporate actions. Results include ending cash,
 the market value of any open position, and return versus initial cash. Load
 price history first with `manage.py load_price_history`.
 
+## Personal stock monitoring
+
+Authenticated users can create private watchlists, add shares, and set a target
+price condition (“at or above” or “at or below”). The existing 15-minute market
+quote refresh evaluates these levels; in-app notifications are available from
+the navigation bar. One notification is created when a condition first becomes
+true. Further quote refreshes while the price remains beyond the target do not
+repeat it. The alert rearms after a later quote moves back outside the condition,
+so a subsequent crossing can notify again. Missing quotes (including times when
+the provider has no new market data) do not generate alerts. Notifications are
+private to the watchlist owner.
+
 ISS does not expose FIGI or T-Invest UID. The application stores the stable
 synthetic identifier `MOEX:{BOARDID}:{SECID}` in both `figi` and `uid`, takes
 ISIN from ISS `ISIN`, ticker from `SECID`, name from `SHORTNAME` (falling back
