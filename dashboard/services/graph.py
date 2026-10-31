@@ -1,30 +1,18 @@
-import logging
-
+from django.utils import timezone
 from plotly.graph_objs import Figure, Scatter
 
-from .market_data import MarketDataError, get_provider
-
-logger = logging.getLogger(__name__)
-
-GRAPH_DAYS = 180
 GRAPH_HEIGHT = 450
 
 
-def get_graph(share):
-    """Вернуть HTML графика цен закрытия или None, если данных нет"""
-    try:
-        candles = get_provider().get_daily_candles(share, GRAPH_DAYS)
-    except MarketDataError as e:
-        logger.error("График %s не построен: %s", share.ticker, e)
-        return None
-
-    if not candles:
+def get_graph(share, points):
+    """Вернуть HTML графика цены по точкам истории или None, если их нет"""
+    if not points:
         return None
 
     figure = Figure(
         Scatter(
-            x=[candle.date for candle in candles],
-            y=[candle.close for candle in candles],
+            x=[timezone.localtime(point.moment).replace(tzinfo=None) for point in points],
+            y=[point.price for point in points],
             mode="lines",
             name=share.ticker,
             opacity=0.8,

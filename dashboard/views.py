@@ -2,9 +2,10 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, DeleteView, ListView, View, UpdateView
 
-from .forms import ShareModelForm
+from .forms import DEFAULT_PERIOD, PERIOD_CHOICES, PeriodForm, ShareModelForm
 from .models import Share
 from .services.graph import get_graph
+from .services.price_history import compute_stats, daily_changes, get_series
 from django.contrib.auth.mixins import UserPassesTestMixin
 
 
@@ -30,11 +31,26 @@ class ShareDetailView(View):
     @staticmethod
     def get(request, pk):
         share = get_object_or_404(Share, id=pk)
+        form = PeriodForm(request.GET)
+        points = []
+        selected_period = None
+        if form.is_valid():
+            points = get_series(share, *form.get_range())
+            if not form.is_custom():
+                selected_period = form.cleaned_data["period"] or DEFAULT_PERIOD
 
         return render(
             request,
             "dashboard/detail.html",
-            {"plot_div": get_graph(share), "share": share},
+            {
+                "share": share,
+                "form": form,
+                "periods": PERIOD_CHOICES,
+                "selected_period": selected_period,
+                "plot_div": get_graph(share, points),
+                "stats": compute_stats(points),
+                "changes": daily_changes(points),
+            },
         )
 
 
