@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     "user",
     "strategies",
     "monitoring",
+    "portfolios",
     "rest_framework",
     "django_filters",
 ]
