@@ -1,0 +1,20 @@
+{% if show %}
+    {% if watchlists %}
+        <form method="post" action="{% url 'monitoring:item_add' %}" class="row g-2 mt-2">
+            <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+            <input type="hidden" name="share" value="{{ share.pk }}">
+            <div class="col-auto">
+                <select name="watchlist" class="form-select form-select-sm" aria-label="Список наблюдения">
+                    {% for watchlist in watchlists %}
+                        <option value="{{ watchlist.pk }}">{{ watchlist.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-outline-primary">Добавить в список наблюдения</button>
+            </div>
+        </form>
+    {% else %}
+        <a href="{% url 'monitoring:create' %}" class="btn btn-sm btn-outline-primary mt-2">Создать список наблюдения</a>
+    {% endif %}
+{% endif %}

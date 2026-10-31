@@ -18,6 +18,8 @@
             <li><a href="{% url 'dashboard:index' %}" class="nav-link px-2 link-secondary">Главная</a></li>
             {% if user.is_authenticated %}
                 <li><a href="{% url 'strategies:list' %}" class="nav-link px-2 link-secondary">Стратегии</a></li>
+                <li><a href="{% url 'monitoring:list' %}" class="nav-link px-2 link-secondary">Наблюдение</a></li>
+                <li><a href="{% url 'monitoring:notifications' %}" class="nav-link px-2 link-secondary">Уведомления{% if unread_notifications %} ({{ unread_notifications }}){% endif %}</a></li>
             {% endif %}
         </ul>
 

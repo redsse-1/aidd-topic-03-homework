@@ -1,0 +1,60 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}
+<title>Уведомления</title>
+{% endblock %}
+
+{% block content %}
+    <h4>Уведомления</h4>
+    <p class="text-muted">Цены приходят из источника с задержкой, поэтому фактическое достижение уровня могло произойти раньше.</p>
+
+    {% if notifications %}
+        <form method="post" action="{% url 'monitoring:notifications_read_all' %}" class="mb-3">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-secondary">Прочитать все</button>
+        </form>
+
+        <table class="table table-striped align-middle">
+            <thead>
+            <tr>
+                <th scope="col">Время</th>
+                <th scope="col">Акция</th>
+                <th scope="col">Событие</th>
+                <th scope="col">Цена</th>
+                <th scope="col"></th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for notification in notifications %}
+                <tr{% if not notification.read_at %} class="fw-bold"{% endif %}>
+                    <td>{{ notification.created_at|date:"d.m.Y H:i" }}</td>
+                    <td><a href="{% url 'dashboard:detail' notification.share_id %}">{{ notification.share.ticker }}</a></td>
+                    <td>{{ notification.event_text }}: {{ notification.target_price.normalize }}</td>
+                    <td>{{ notification.price.normalize }} {{ notification.share.currency }}</td>
+                    <td>
+                        {% if not notification.read_at %}
+                            <form method="post" action="{% url 'monitoring:notification_read' notification.pk %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-secondary">Прочитано</button>
+                            </form>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+        {% if page_obj.has_other_pages %}
+            <div class="btn-group" role="group" aria-label="Страницы">
+                {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}" class="btn btn-outline-primary">&laquo;</a>
+                {% endif %}
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}" class="btn btn-outline-primary">&raquo;</a>
+                {% endif %}
+            </div>
+        {% endif %}
+    {% else %}
+        <p>Уведомлений пока нет</p>
+    {% endif %}
+{% endblock %}

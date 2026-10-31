@@ -1,0 +1,87 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}
+<title>{{ watchlist.name }}</title>
+{% endblock %}
+
+{% block content %}
+    <h4>{{ watchlist.name }}</h4>
+
+    <div class="mb-3 d-flex gap-2">
+        <a href="{% url 'monitoring:update' watchlist.pk %}" class="btn btn-secondary">Переименовать</a>
+        <a href="{% url 'monitoring:delete' watchlist.pk %}" class="btn btn-danger">Удалить список</a>
+    </div>
+
+    <form method="post" action="{% url 'monitoring:item_add' %}" class="row g-2 mb-3">
+        {% csrf_token %}
+        <input type="hidden" name="watchlist" value="{{ watchlist.pk }}">
+        <div class="col-auto">
+            <select name="share" class="form-select" aria-label="Акция" required>
+                <option value="">Выберите акцию</option>
+                {% for share in form.fields.share.queryset %}
+                    <option value="{{ share.pk }}">{{ share.ticker }} — {{ share.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-primary">Добавить акцию</button>
+        </div>
+    </form>
+
+    {% if items %}
+        <table class="table table-striped align-middle">
+            <thead>
+            <tr>
+                <th scope="col">Тикер</th>
+                <th scope="col">Название</th>
+                <th scope="col">Текущая цена</th>
+                <th scope="col">Целевые уровни</th>
+                <th scope="col">Управление</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for item in items %}
+                <tr>
+                    <td><a href="{% url 'dashboard:detail' item.share.id %}">{{ item.share.ticker }}</a></td>
+                    <td>{{ item.share.name }}</td>
+                    <td>{{ item.share.last_price|default_if_none:"—" }} {{ item.share.currency }}</td>
+                    <td>
+                        {% for target in item.targets.all %}
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <span>
+                                    {{ target.get_direction_display }}: {{ target.target_price.normalize }}
+                                    {% if not target.is_active %}
+                                        <span class="badge bg-secondary">выключен</span>
+                                    {% elif target.is_triggered %}
+                                        <span class="badge bg-success">достигнут</span>
+                                    {% else %}
+                                        <span class="badge bg-primary">ожидает</span>
+                                    {% endif %}
+                                </span>
+                                <a href="{% url 'monitoring:target_update' target.pk %}" class="btn btn-sm btn-outline-secondary">Изменить</a>
+                                <form method="post" action="{% url 'monitoring:target_delete' target.pk %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button>
+                                </form>
+                            </div>
+                        {% empty %}
+                            <span class="text-muted">не заданы</span>
+                        {% endfor %}
+                    </td>
+                    <td>
+                        <div class="d-flex gap-2">
+                            <a href="{% url 'monitoring:target_add' item.pk %}" class="btn btn-sm btn-primary">Добавить уровень</a>
+                            <form method="post" action="{% url 'monitoring:item_delete' item.pk %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Убрать из списка</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>В списке пока нет акций</p>
+    {% endif %}
+{% endblock %}

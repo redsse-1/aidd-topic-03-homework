@@ -5,11 +5,13 @@
 {% endblock %}
 
 {% block content %}
+    {% load monitoring_tags %}
     <div class="row">
         <div class="col-12">
             Инструмент: {{ share.name }} <br>
             Текущая цена: {{ share.last_price }} {{ share.currency }} <br>
             Время последнего обновления: {{ share.updated_at }}
+            {% watch_form share %}
         </div>
     </div>
 

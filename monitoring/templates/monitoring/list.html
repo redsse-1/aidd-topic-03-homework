@@ -1,0 +1,33 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}
+<title>Списки наблюдения</title>
+{% endblock %}
+
+{% block content %}
+    <h4>Списки наблюдения</h4>
+    <div class="mb-3">
+        <a href="{% url 'monitoring:create' %}" class="btn btn-primary">Создать список</a>
+    </div>
+
+    {% if watchlists %}
+        <table class="table table-striped">
+            <thead>
+            <tr>
+                <th scope="col">Название</th>
+                <th scope="col">Акций</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for watchlist in watchlists %}
+                <tr>
+                    <td><a href="{% url 'monitoring:detail' watchlist.pk %}">{{ watchlist.name }}</a></td>
+                    <td>{{ watchlist.shares }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>Списков ещё нет</p>
+    {% endif %}
+{% endblock %}

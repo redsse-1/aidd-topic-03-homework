@@ -1,0 +1,13 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}
+<title>{{ title }}</title>
+{% endblock %}
+
+{% block content %}
+    <form method="post">
+        {% csrf_token %}
+        <p>Вы уверены, что хотите удалить список <b>"{{ object.name }}"</b> и его целевые уровни? Полученные уведомления сохранятся.</p>
+        <input type="submit" class="btn btn-sm btn-outline-danger rounded-pill" value="Удалить" />
+    </form>
+{% endblock %}
