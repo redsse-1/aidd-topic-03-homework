@@ -1,0 +1,3 @@
+# Необязательно: нужно только для MARKET_DATA_PROVIDER=tinvest.
+# Приложение работает и без этого пакета. См. ANALYSIS.md, раздел 3.
+t-tech-investments==0.3.3
