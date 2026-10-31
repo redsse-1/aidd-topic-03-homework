@@ -34,6 +34,4 @@ def get_graph(share):
         ],
         output_type="div",
         include_plotlyjs="cdn",
-        show_link=False,
-        link_text="",
     )
