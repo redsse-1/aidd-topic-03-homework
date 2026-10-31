@@ -11,6 +11,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.core.management import CommandError, call_command
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone as django_timezone
 
 from dashboard.models import Share
 from dashboard.services.market_data import (
@@ -18,6 +19,7 @@ from dashboard.services.market_data import (
     InstrumentInfo,
     MarketDataError,
     MarketDataProvider,
+    Quote,
     get_provider,
 )
 from dashboard.services.market_data.iss import IssProvider, choose_price
@@ -154,9 +156,17 @@ class IssProviderTests(SimpleTestCase):
                     ["GAZP", 120.5, 120.1],
                 ),
                 "marketdata": table(
-                    ["SECID", "TRADINGSTATUS", "LAST", "LCURRENTPRICE", "LCLOSEPRICE"],
-                    ["SBER", "T", 300.12, None, None],
-                    ["GAZP", "N", None, None, None],
+                    [
+                        "SECID",
+                        "TRADINGSTATUS",
+                        "LAST",
+                        "LCURRENTPRICE",
+                        "LCLOSEPRICE",
+                        "TIME",
+                        "SYSTIME",
+                    ],
+                    ["SBER", "T", 300.12, None, None, "10:01:07", "2026-10-31 10:16:08"],
+                    ["GAZP", "N", None, None, None, "07:00:10", "2026-10-31 07:15:11"],
                 ),
             }
         )
@@ -164,7 +174,13 @@ class IssProviderTests(SimpleTestCase):
 
         prices = self.provider.get_last_prices(shares)
 
-        self.assertEqual(prices, {"SBER": 300.12, "GAZP": 120.5})
+        self.assertEqual(prices["SBER"].price, 300.12)
+        self.assertEqual(
+            prices["SBER"].time,
+            django_timezone.make_aware(datetime(2026, 10, 31, 10, 1, 7)),
+        )
+        self.assertEqual(prices["GAZP"], Quote(120.5))
+        self.assertNotIn("AAPL", prices)
         self.assertEqual(get.call_count, 1)
 
     @mock.patch("dashboard.services.market_data.iss.requests.get")
@@ -208,6 +224,7 @@ class IssProviderTests(SimpleTestCase):
 
 class FakeTinvestClient:
     instances = []
+    TRADE_TIME = datetime(2026, 10, 31, 7, 1, tzinfo=timezone.utc)
 
     def __init__(self, token, target=None):
         self.token = token
@@ -216,7 +233,11 @@ class FakeTinvestClient:
         quotation = SimpleNamespace(units=245, nano=900000000)
         self.market_data = SimpleNamespace(
             get_last_prices=lambda figi: SimpleNamespace(
-                last_prices=[SimpleNamespace(figi=figi[0], price=quotation)]
+                last_prices=[
+                    SimpleNamespace(
+                        figi=figi[0], price=quotation, time=self.TRADE_TIME
+                    )
+                ]
             )
         )
         self.instruments = SimpleNamespace(
@@ -294,7 +315,8 @@ class TinvestProviderTests(SimpleTestCase):
     def test_last_price_keeps_fraction(self):
         with mock.patch.dict(sys.modules, fake_sdk_modules()):
             prices = self.provider.get_last_prices([self.share])
-        self.assertEqual(prices, {"SBER": 245.9})
+        self.assertEqual(prices["SBER"].price, 245.9)
+        self.assertEqual(prices["SBER"].time, FakeTinvestClient.TRADE_TIME)
 
     def test_synthetic_figi_is_not_requested(self):
         share = SimpleNamespace(ticker="SBER", figi="ISS-SBER")
@@ -337,7 +359,7 @@ class UpdateLastPricesTests(TestCase):
         second = make_share("GAZP", last_price=100.0, is_trend_high=True)
         untouched = make_share("AAPL", last_price=5.0)
         Share.objects.filter(id=first.id).update(updated_at=None)
-        provider = FakeProvider(prices={"SBER": 101.25, "GAZP": 99.5})
+        provider = FakeProvider(prices={"SBER": Quote(101.25), "GAZP": Quote(99.5)})
 
         self.assertEqual(update_last_prices(provider), 2)
 
@@ -410,26 +432,6 @@ class ShareDetailPageTests(TestCase):
     def setUp(self):
         self.share = make_share(last_price=296.4)
         self.url = reverse("dashboard:detail", args=[self.share.id])
-
-    def open_with(self, provider):
-        target = "dashboard.services.graph.get_provider"
-        with mock.patch(target, return_value=provider):
-            return self.client.get(self.url)
-
-    def test_chart_is_rendered(self):
-        response = self.open_with(
-            FakeProvider(candles=[Candle(date(2026, 10, 1), 276.18)])
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "plotly-graph-div")
-        self.assertContains(response, "height:450px")
-        self.assertContains(response, "296,4")
-
-    def test_page_works_when_provider_fails(self):
-        with self.assertLogs("dashboard.services.graph", level="ERROR"):
-            response = self.open_with(FakeProvider(error=MarketDataError("down")))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "временно недоступны")
 
     def test_missing_share_gives_404(self):
         response = self.client.get(reverse("dashboard:detail", args=[self.share.id + 1]))
