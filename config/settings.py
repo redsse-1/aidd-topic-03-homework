@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "crispy_bootstrap5",
     "dashboard",
     "user",
+    "strategies",
     "rest_framework",
     "django_filters",
 ]
@@ -183,6 +184,10 @@ CELERY_BEAT_SCHEDULE = {
     "update-price-history": {
         "task": "dashboard.tasks.update_price_history",
         "schedule": crontab(hour=1, minute=0),
+    },
+    "update-strategies": {
+        "task": "strategies.tasks.update_strategies",
+        "schedule": crontab(hour=1, minute=30),
     },
 }
 
