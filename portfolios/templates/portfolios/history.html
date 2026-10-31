@@ -1,0 +1,53 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}
+<title>История операций</title>
+{% endblock %}
+
+{% block content %}
+    <h4>История операций: <a href="{% url 'portfolios:detail' portfolio.pk %}">{{ portfolio.name }}</a></h4>
+
+    {% if operations %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                <tr>
+                    <th scope="col">Время</th>
+                    <th scope="col">Операция</th>
+                    <th scope="col">Акция</th>
+                    <th scope="col">Количество</th>
+                    <th scope="col">Цена</th>
+                    <th scope="col">Сумма</th>
+                    <th scope="col">Результат продажи</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for operation in operations %}
+                    <tr>
+                        <td>{{ operation.created_at|date:"d.m.Y H:i:s" }}</td>
+                        <td>{{ operation.get_side_display }}</td>
+                        <td>{{ operation.share.ticker }}</td>
+                        <td>{{ operation.quantity }}</td>
+                        <td>{{ operation.price.normalize }}</td>
+                        <td>{{ operation.amount }}</td>
+                        <td>{{ operation.realized_profit|default_if_none:"" }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if page_obj.has_other_pages %}
+            <div class="btn-group" role="group" aria-label="Страницы">
+                {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}" class="btn btn-outline-primary">&laquo;</a>
+                {% endif %}
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}" class="btn btn-outline-primary">&raquo;</a>
+                {% endif %}
+            </div>
+        {% endif %}
+    {% else %}
+        <p>Операций пока нет</p>
+    {% endif %}
+{% endblock %}

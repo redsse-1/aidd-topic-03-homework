@@ -1,0 +1,28 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}
+<title>Операция</title>
+{% endblock %}
+
+{% block content %}
+{% load crispy_forms_tags %}
+<div class="row">
+    <div class="col-12 col-md-8 col-lg-6">
+        <h4>Операция: {{ portfolio.name }}</h4>
+        <p class="text-muted">
+            Операция виртуальная и выполняется по текущей цене акции в приложении.
+            Цена обновляется с задержкой и могла измениться с момента открытия формы.
+        </p>
+        <form method="post">
+            {% csrf_token %}
+            {% for error in form.non_field_errors %}
+                <div class="alert alert-danger">{{ error }}</div>
+            {% endfor %}
+            {% for field in form %}
+                {{ field|as_crispy_field }}
+            {% endfor %}
+            <button class="w-100 btn btn-lg btn-primary mt-3" type="submit">Выполнить</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

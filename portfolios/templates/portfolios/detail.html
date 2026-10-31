@@ -1,0 +1,105 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}
+<title>{{ portfolio.name }}</title>
+{% endblock %}
+
+{% block content %}
+    <h4>{{ portfolio.name }}</h4>
+
+    <div class="mb-3 d-flex flex-wrap gap-2">
+        <a href="{% url 'portfolios:trade' portfolio.pk %}" class="btn btn-primary">Купить или продать</a>
+        <a href="{% url 'portfolios:history' portfolio.pk %}" class="btn btn-secondary">История операций</a>
+        <a href="{% url 'portfolios:update' portfolio.pk %}" class="btn btn-secondary">Переименовать</a>
+        <a href="{% url 'portfolios:delete' portfolio.pk %}" class="btn btn-danger">Удалить</a>
+    </div>
+
+    <table class="table table-sm w-auto">
+        <tbody>
+        <tr><th scope="row">Текущая стоимость</th><td>{{ summary.market_value }}</td></tr>
+        <tr><th scope="row">Вложено в открытые позиции</th><td>{{ summary.cost }}</td></tr>
+        <tr>
+            <th scope="row">Нереализованная прибыль</th>
+            <td style="color: {% if summary.unrealized > 0 %}seagreen{% elif summary.unrealized < 0 %}crimson{% else %}inherit{% endif %}">
+                {{ summary.unrealized }}{% if summary.unrealized_percent is not None %} ({{ summary.unrealized_percent }}%){% endif %}
+            </td>
+        </tr>
+        <tr>
+            <th scope="row">Реализованная прибыль</th>
+            <td style="color: {% if summary.realized > 0 %}seagreen{% elif summary.realized < 0 %}crimson{% else %}inherit{% endif %}">{{ summary.realized }}</td>
+        </tr>
+        <tr><th scope="row">Прибыль всего</th><td>{{ summary.total_profit }}</td></tr>
+        </tbody>
+    </table>
+
+    {% if summary.unpriced %}
+        <div class="alert alert-warning">Акций без текущей цены: {{ summary.unpriced }}. Они не учтены в стоимости и нереализованной прибыли.</div>
+    {% endif %}
+
+    <h5>Позиции</h5>
+    {% if summary.rows %}
+        <div class="table-responsive">
+            <table class="table table-striped align-middle">
+                <thead>
+                <tr>
+                    <th scope="col">Акция</th>
+                    <th scope="col">Количество</th>
+                    <th scope="col">Средняя цена</th>
+                    <th scope="col">Текущая цена</th>
+                    <th scope="col">Вложено</th>
+                    <th scope="col">Стоимость</th>
+                    <th scope="col">Прибыль</th>
+                    <th scope="col"></th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in summary.rows %}
+                    <tr>
+                        <td><a href="{% url 'dashboard:detail' row.position.share_id %}">{{ row.position.share.ticker }}</a></td>
+                        <td>{{ row.position.quantity }}</td>
+                        <td>{{ row.position.average_price|floatformat:4 }}</td>
+                        <td>{{ row.price|default_if_none:"нет цены" }}</td>
+                        <td>{{ row.cost }}</td>
+                        <td>{{ row.market_value|default_if_none:"—" }}</td>
+                        <td>
+                            {% if row.unrealized is not None %}
+                                {{ row.unrealized }} ({{ row.unrealized_percent }}%)
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="d-flex gap-2">
+                                <a href="{% url 'portfolios:trade' portfolio.pk %}?share={{ row.position.share_id }}&side=buy" class="btn btn-sm btn-outline-primary">Купить</a>
+                                <a href="{% url 'portfolios:trade' portfolio.pk %}?share={{ row.position.share_id }}&side=sell" class="btn btn-sm btn-outline-danger">Продать</a>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p>Открытых позиций нет</p>
+    {% endif %}
+
+    {% if summary.closed %}
+        <h5>Закрытые позиции</h5>
+        <table class="table table-sm w-auto">
+            <thead>
+            <tr>
+                <th scope="col">Акция</th>
+                <th scope="col">Реализованная прибыль</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for position in summary.closed %}
+                <tr>
+                    <td><a href="{% url 'dashboard:detail' position.share_id %}">{{ position.share.ticker }}</a></td>
+                    <td>{{ position.realized_profit }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+{% endblock %}
