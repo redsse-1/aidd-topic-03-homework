@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "dashboard",
     "user",
     "strategies",
+    "monitoring",
     "rest_framework",
     "django_filters",
 ]
@@ -107,6 +108,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "monitoring.context_processors.unread_notifications",
             ],
         },
     },
@@ -166,6 +168,9 @@ TINVEST_ROOT_CA_PATH = os.environ.get("TINVEST_ROOT_CA_PATH", "")
 HISTORY_BACKFILL_DAYS = int(os.environ.get("HISTORY_BACKFILL_DAYS", "365"))
 HISTORY_QUOTE_RETENTION_DAYS = int(os.environ.get("HISTORY_QUOTE_RETENTION_DAYS", "30"))
 HISTORY_REQUEST_PAUSE = float(os.environ.get("HISTORY_REQUEST_PAUSE", "0.2"))
+
+"""Monitoring"""
+MONITORING_REARM_PERCENT = float(os.environ.get("MONITORING_REARM_PERCENT", "0.1"))
 
 """Celery Configuration Options"""
 CELERY_TIMEZONE = TIME_ZONE
