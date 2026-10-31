@@ -1,3 +1,4 @@
+from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -7,6 +8,9 @@ from dashboard.models import Share
 
 class DashboardTests(APITestCase):
     def setUp(self) -> None:
+        self.user = get_user_model().objects.create_user("api@test.local")
+        self.client.force_authenticate(self.user)
+
         self.apple_share = Share.objects.create(
             figi="BBG000B9XRY4",
             isin="US0378331005",
@@ -52,7 +56,7 @@ class DashboardTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_share_detail_invalid(self):
-        response = self.client.get("/api/v1/shares/2/")
+        response = self.client.get(f"/api/v1/shares/{self.apple_share.id + 1}/")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_share_update(self):
@@ -117,6 +121,47 @@ class DashboardTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 0)
 
+    def test_second_share_can_be_created_without_uid(self):
+        first = {**self.second_company}
+        first.pop("uid")
+        second = {**first, "figi": "F3", "isin": "I3", "ticker": "TEST3"}
+
+        for data in (first, second):
+            response = self.client.post("/api/v1/shares/", data, format="json")
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_invalid_search_regex_gives_400(self):
+        response = self.client.get("/api/v1/shares/", {"search": "("})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_search_filter_and_ordering(self):
+        response = self.client.get("/api/v1/shares/", {"search": "^app"})
+        self.assertEqual(len(response.data["results"]), 1)
+        response = self.client.get("/api/v1/shares/", {"ticker": "AAPL"})
+        self.assertEqual(len(response.data["results"]), 1)
+        response = self.client.get("/api/v1/shares/", {"ticker": "NONE"})
+        self.assertEqual(len(response.data["results"]), 0)
+        response = self.client.get("/api/v1/shares/", {"ordering": "-ticker"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_anonymous_client_can_read_but_not_write(self):
+        self.client.force_authenticate(None)
+        url = f"/api/v1/shares/{self.apple_share.id}/"
+
+        self.assertEqual(self.client.get("/api/v1/shares/").status_code, 200)
+        self.assertEqual(self.client.get(url).status_code, 200)
+        requests = (
+            self.client.post("/api/v1/shares/", self.second_company, format="json"),
+            self.client.patch(url, {"name": "x"}, format="json"),
+            self.client.delete(url),
+        )
+        for response in requests:
+            self.assertIn(
+                response.status_code,
+                (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN),
+            )
+        self.assertTrue(Share.objects.filter(id=self.apple_share.id).exists())
+
     def test_share_delete_invalid(self):
-        response = self.client.delete("/api/v1/shares/3/")
+        response = self.client.delete(f"/api/v1/shares/{self.apple_share.id + 1}/")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
