@@ -422,6 +422,7 @@ class ShareDetailPageTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "plotly-graph-div")
+        self.assertContains(response, "height:450px")
         self.assertContains(response, "296,4")
 
     def test_page_works_when_provider_fails(self):
