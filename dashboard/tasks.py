@@ -1,28 +1,15 @@
+import logging
+
 from config.celery import app
-from dashboard.models import Share
-from dashboard.services.market_data import get_last_data
-from config.settings import logger
+from dashboard.services.market_data import MarketDataError, get_provider
+from dashboard.services.shares import update_last_prices
+
+logger = logging.getLogger(__name__)
 
 
 @app.task
 def update_last_price():
-    shares = Share.objects.all()
-
-    for share in shares:
-        try:
-            [last_price, detetime] = get_last_data(share)
-
-            try:
-                if share.last_price > last_price:
-                    is_trend_high = False
-                else:
-                    is_trend_high = True
-            except Exception as e:
-                logger.error(e)
-                is_trend_high = True
-
-            Share.objects.filter(id=share.id).update(
-                last_price=last_price, is_trend_high=is_trend_high
-            )
-        except Exception as e:
-            logger.error(e)
+    try:
+        update_last_prices(get_provider())
+    except MarketDataError as e:
+        logger.error(e)
