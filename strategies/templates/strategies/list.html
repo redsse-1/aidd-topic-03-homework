@@ -1,0 +1,43 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}
+<title>Мои стратегии</title>
+{% endblock %}
+
+{% block content %}
+    <h4>Мои стратегии</h4>
+    <div class="mb-3">
+        <a href="{% url 'strategies:create' %}" class="btn btn-primary">Создать стратегию</a>
+    </div>
+
+    {% if strategies %}
+        <table class="table table-striped">
+            <thead>
+            <tr>
+                <th scope="col">Название</th>
+                <th scope="col">Акция</th>
+                <th scope="col">Доходность, %</th>
+                <th scope="col">Покупка и удержание, %</th>
+                <th scope="col">Закрытых сделок</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for strategy in strategies %}
+                <tr>
+                    <td><a href="{% url 'strategies:detail' strategy.pk %}">{{ strategy.name }}</a></td>
+                    <td>{{ strategy.share.ticker }}</td>
+                    {% if strategy.result %}
+                        <td>{{ strategy.result.return_percent }}</td>
+                        <td>{{ strategy.result.buy_hold_percent }}</td>
+                        <td>{{ strategy.result.closed_trades }}</td>
+                    {% else %}
+                        <td colspan="3">Не рассчитана</td>
+                    {% endif %}
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>Стратегий ещё нет</p>
+    {% endif %}
+{% endblock %}
