@@ -3,7 +3,7 @@ import logging
 import os
 from datetime import timedelta
 
-from .base import Candle, InstrumentInfo, MarketDataError, MarketDataProvider
+from .base import Candle, InstrumentInfo, MarketDataError, MarketDataProvider, Quote
 from .iss import SYNTHETIC_FIGI_PREFIX
 
 logger = logging.getLogger(__name__)
@@ -81,7 +81,9 @@ class TinvestProvider(MarketDataProvider):
         def request(client, sdk, utils):
             response = client.market_data.get_last_prices(figi=list(tickers))
             return {
-                tickers[item.figi]: float(utils.quotation_to_decimal(item.price))
+                tickers[item.figi]: Quote(
+                    float(utils.quotation_to_decimal(item.price)), item.time
+                )
                 for item in response.last_prices
                 if item.figi in tickers
             }

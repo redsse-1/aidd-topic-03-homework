@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 
 
 class MarketDataError(Exception):
@@ -20,6 +20,14 @@ class InstrumentInfo:
 
 
 @dataclass(frozen=True)
+class Quote:
+    """Цена акции. time — время сделки или None, если это не цена сделки на торгах."""
+
+    price: float
+    time: datetime | None = None
+
+
+@dataclass(frozen=True)
 class Candle:
     """Дневная свеча"""
 
@@ -36,7 +44,7 @@ class MarketDataProvider(ABC):
 
     @abstractmethod
     def get_last_prices(self, shares):
-        """Вернуть словарь {ticker: цена} одним запросом. Акций без цены в нём нет."""
+        """Вернуть словарь {ticker: Quote} одним запросом. Акций без цены в нём нет."""
 
     @abstractmethod
     def get_daily_candles(self, share, days):

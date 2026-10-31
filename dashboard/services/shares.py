@@ -5,6 +5,8 @@ from django.utils import timezone
 
 from dashboard.models import Share
 
+from .price_history import record_quotes
+
 logger = logging.getLogger(__name__)
 
 
@@ -20,22 +22,26 @@ def compute_trend(old_price, new_price, current_trend):
 def update_last_prices(provider):
     """Обновить цены и тренд всех акций одним запросом к провайдеру"""
     shares = list(Share.objects.all())
-    prices = provider.get_last_prices(shares)
+    quotes = provider.get_last_prices(shares)
     updated_at = timezone.now()
 
     updated = []
     for share in shares:
-        price = prices.get(share.ticker)
-        if price is None:
+        quote = quotes.get(share.ticker)
+        if quote is None:
             continue
         share.is_trend_high = compute_trend(
-            share.last_price, price, share.is_trend_high
+            share.last_price, quote.price, share.is_trend_high
         )
-        share.last_price = price
+        share.last_price = quote.price
         share.updated_at = updated_at
         updated.append(share)
 
-    Share.objects.bulk_update(updated, ["last_price", "is_trend_high", "updated_at"])
+    with transaction.atomic():
+        Share.objects.bulk_update(
+            updated, ["last_price", "is_trend_high", "updated_at"]
+        )
+        record_quotes(shares, quotes)
     logger.info("Цены обновлены: %s из %s", len(updated), len(shares))
     return len(updated)
 

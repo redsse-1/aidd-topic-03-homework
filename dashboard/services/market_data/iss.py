@@ -1,8 +1,9 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import requests
+from django.utils import timezone
 
-from .base import Candle, InstrumentInfo, MarketDataError, MarketDataProvider
+from .base import Candle, InstrumentInfo, MarketDataError, MarketDataProvider, Quote
 
 # Тип бумаги SECTYPE: 1 — обыкновенная акция, 2 — привилегированная,
 # D — депозитарная расписка. Остальное в режиме TQBR — паи фондов.
@@ -30,6 +31,20 @@ def choose_price(security, marketdata):
         if security.get(column):
             return float(security[column])
     return None
+
+
+def trade_time(marketdata):
+    """Вернуть время последней сделки на торгах. В ISS оно дано без даты, по Москве."""
+    if marketdata.get("TRADINGSTATUS") != TRADING_STATUS or not marketdata.get("LAST"):
+        return None
+    system_time = datetime.fromisoformat(marketdata["SYSTIME"])
+    moment = datetime.combine(
+        system_time.date(), datetime.strptime(marketdata["TIME"], "%H:%M:%S").time()
+    )
+    # Из-за задержки данных сделка до полуночи приходит уже следующей датой
+    if moment > system_time:
+        moment -= timedelta(days=1)
+    return timezone.make_aware(moment)
 
 
 class IssProvider(MarketDataProvider):
@@ -92,22 +107,23 @@ class IssProvider(MarketDataProvider):
             **{
                 "iss.only": "securities,marketdata",
                 "securities.columns": "SECID,PREVLEGALCLOSEPRICE,PREVPRICE",
-                "marketdata.columns": "SECID,TRADINGSTATUS,LAST,LCURRENTPRICE,LCLOSEPRICE",
+                "marketdata.columns": (
+                    "SECID,TRADINGSTATUS,LAST,LCURRENTPRICE,LCLOSEPRICE,TIME,SYSTIME"
+                ),
             },
         )
         securities = {row["SECID"]: row for row in self._rows(payload, "securities")}
         marketdata = {row["SECID"]: row for row in self._rows(payload, "marketdata")}
 
-        prices = {}
+        quotes = {}
         for share in shares:
             if share.ticker not in securities:
                 continue
-            price = choose_price(
-                securities[share.ticker], marketdata.get(share.ticker, {})
-            )
+            market = marketdata.get(share.ticker, {})
+            price = choose_price(securities[share.ticker], market)
             if price is not None:
-                prices[share.ticker] = price
-        return prices
+                quotes[share.ticker] = Quote(price, trade_time(market))
+        return quotes
 
     def get_daily_candles(self, share, days):
         date_from = (date.today() - timedelta(days=days)).isoformat()

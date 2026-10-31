@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 
+from celery.schedules import crontab
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
@@ -160,6 +161,11 @@ TINVEST_TOKEN = os.environ.get("TINVEST_TOKEN", "")
 TINVEST_TARGET = os.environ.get("TINVEST_TARGET", "invest-public-api.tbank.ru:443")
 TINVEST_ROOT_CA_PATH = os.environ.get("TINVEST_ROOT_CA_PATH", "")
 
+"""Price history"""
+HISTORY_BACKFILL_DAYS = int(os.environ.get("HISTORY_BACKFILL_DAYS", "365"))
+HISTORY_QUOTE_RETENTION_DAYS = int(os.environ.get("HISTORY_QUOTE_RETENTION_DAYS", "30"))
+HISTORY_REQUEST_PAUSE = float(os.environ.get("HISTORY_REQUEST_PAUSE", "0.2"))
+
 """Celery Configuration Options"""
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True
@@ -173,6 +179,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "dashboard.tasks.update_last_price",
         "schedule": PRICE_UPDATE_INTERVAL,
         "options": {"expires": PRICE_UPDATE_INTERVAL},
+    },
+    "update-price-history": {
+        "task": "dashboard.tasks.update_price_history",
+        "schedule": crontab(hour=1, minute=0),
     },
 }
 

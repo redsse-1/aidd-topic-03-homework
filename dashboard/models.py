@@ -28,3 +28,32 @@ class Share(models.Model):
 
     def __str__(self):
         return f"{self.ticker} {self.name}"
+
+
+class PriceRecord(models.Model):
+    """Запись истории цены акции"""
+
+    class Kind(models.TextChoices):
+        DAILY = "daily", "Дневное закрытие"
+        QUOTE = "quote", "Внутридневная котировка"
+
+    share = models.ForeignKey(
+        Share, on_delete=models.CASCADE, related_name="price_records"
+    )
+    kind = models.CharField(max_length=5, choices=Kind.choices)
+    recorded_at = models.DateTimeField(verbose_name="Время цены в источнике")
+    price = models.FloatField(verbose_name="Цена")
+
+    class Meta:
+        verbose_name = "Запись истории цены"
+        verbose_name_plural = "История цен"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["share", "kind", "recorded_at"],
+                name="unique_price_record",
+            )
+        ]
+        indexes = [models.Index(fields=["kind", "recorded_at"])]
+
+    def __str__(self):
+        return f"{self.share_id} {self.kind} {self.recorded_at}: {self.price}"

@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
-from .base import Candle, InstrumentInfo, MarketDataError, MarketDataProvider
+from .base import Candle, InstrumentInfo, MarketDataError, MarketDataProvider, Quote
 from .iss import IssProvider
 from .tinvest import TinvestProvider
 
@@ -10,6 +10,7 @@ __all__ = (
     "InstrumentInfo",
     "MarketDataError",
     "MarketDataProvider",
+    "Quote",
     "get_provider",
 )
 
