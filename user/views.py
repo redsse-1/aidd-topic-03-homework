@@ -5,6 +5,10 @@ from django.views.generic import View
 from .forms import AuthForm, RegistrationForm
 
 
+def first_error(form):
+    return next(iter(form.errors.values()))[0]
+
+
 class AuthView(View):
     """Авторизация"""
 
@@ -15,9 +19,13 @@ class AuthView(View):
     @staticmethod
     def post(request):
         form = AuthForm(request.POST)
-        user = authenticate(
-            request, username=form.data["email"].lower(), password=form.data["password"]
-        )
+        user = None
+        if form.is_valid():
+            user = authenticate(
+                request,
+                username=form.cleaned_data["email"].lower(),
+                password=form.cleaned_data["password"],
+            )
 
         if user is not None:
             login(request, user)
@@ -51,7 +59,7 @@ class RegistrationView(View):
             return render(
                 request,
                 "user/registration.html",
-                {"form": form, "error": form.errors["__all__"].data[0].message},
+                {"form": form, "error": first_error(form)},
             )
 
 
